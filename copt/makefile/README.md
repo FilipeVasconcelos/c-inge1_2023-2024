@@ -7,8 +7,25 @@ son utilisation ainsi que la modularité d'un projet en C
 # Contexte
 
 On se donne un projet composé de deux fichiers f.c et g.c qui 
-permettent la déclaration de deux de fonctions de prototypes :
+permettent la déclaration de deux fonctions de prototypes :
 
-<p align="center">
 `int f(int x)`
-</p>
+`float g(float x)`
+
+présents dans les fichiers headers f.h et g.h respectivement.
+La fonction `main()`, déclarée dans `main.c`, appelle ces deux 
+fonctions.
+
+# Format simple du Makefile
+
+```
+all: main 
+
+f.o: f.h f.c
+	gcc -c f.c
+g.o: g.h g.c
+	gcc -c g.c
+
+main: main.c f.o g.o
+	gcc main.c f.o g.o -o main
+```
