@@ -9,4 +9,6 @@ son utilisation ainsi que la modularité d'un projet en C
 On se donne un projet composé de deux fichiers f.c et g.c qui 
 permettent la déclaration de deux de fonctions de prototypes :
 
+<p align="center">
 `int f(int x)`
+</p>
