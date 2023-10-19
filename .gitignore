@@ -1,0 +1,9 @@
+*.o
+a.out
+main
+
+# remove specific executables
+copt/array/array
+copt/array/array_exo1
+copt/wc/wc_v*/wc
+

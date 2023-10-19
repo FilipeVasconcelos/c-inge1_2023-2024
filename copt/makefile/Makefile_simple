@@ -1,0 +1,8 @@
+all: main
+
+f.o: f.h f.c
+	gcc -c f.c
+g.o: g.h g.c
+	gcc -c g.c
+main: main.c f.o g.o
+	gcc main.c f.o g.o -o main

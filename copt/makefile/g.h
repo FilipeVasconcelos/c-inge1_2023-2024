@@ -1,0 +1,1 @@
+float g(float x);

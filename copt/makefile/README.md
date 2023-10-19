@@ -10,6 +10,7 @@ On se donne un projet composé de deux fichiers f.c et g.c qui
 permettent la déclaration de deux fonctions de prototypes :
 
 `int f(int x)`
+
 `float g(float x)`
 
 présents dans les fichiers headers f.h et g.h respectivement.
