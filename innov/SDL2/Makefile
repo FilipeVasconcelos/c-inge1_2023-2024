@@ -5,7 +5,7 @@ CPP=gcc
 CFLAGS := $(SDL_CFLAGS) -O3
 LDFLAGS := $(SDL_LDFLAGS) -lSDL2_ttf
 
-EXEC=main
+EXEC=goban
 
 all: ${EXEC}
 

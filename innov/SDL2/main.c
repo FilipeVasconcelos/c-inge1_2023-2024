@@ -49,7 +49,6 @@ int main(int argc, char* argv[])
         SDL_Quit();
         return 2;
     }
-
     // Create window
     SDL_Window *window = SDL_CreateWindow("Exemple SDL2 Parcours Innovation",
                                           SDL_WINDOWPOS_UNDEFINED,
@@ -63,10 +62,11 @@ int main(int argc, char* argv[])
     }
     
     // Create renderer
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if(!renderer)
     {
         fprintf(stderr,"SDL_Create_Rendeder failed to initialise: %s\n",SDL_GetError());
+        return 1;
     }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
