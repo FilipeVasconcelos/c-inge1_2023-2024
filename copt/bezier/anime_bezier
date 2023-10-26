@@ -1,0 +1,29 @@
+#!/bin/bash
+k=0
+for P1y in $(seq 2 0.1 3) 
+do
+    for P0x in $(seq 1 0.1 4) 
+    do
+        cat << EOF > data
+${P0x} 0.0
+0.0 ${P1y}
+2.0 1.0
+1.0 0.0
+EOF
+        ./bezier
+        if [ ${k} -lt 10 ]
+        then
+            ./bezier.plot 00${k} 2> /dev/null
+        elif [ ${k} -lt 100 ] 
+        then
+            ./bezier.plot 0${k} 2> /dev/null
+        else
+            ./bezier.plot ${k} 2> /dev/null
+        fi
+        k=$((k+1))
+        echo $k
+    done
+done
+
+convert -delay 10 -loop 0 *.png output.gif
+cp output.gif /mnt/c/Users/Filipe\ VASCONCELOS/Downloads/ 
