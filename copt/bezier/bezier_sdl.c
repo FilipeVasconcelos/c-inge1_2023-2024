@@ -4,19 +4,20 @@
 #include<string.h>
 #include <SDL.h>
 
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 // Define screen dimensions
-#define SCREEN_WIDTH    800
-#define SCREEN_HEIGHT   600
-// some scaling values
-#define SCALE_WIDTH    160
-#define SCALE_HEIGHT   120
+#define SCREEN_WIDTH    1200 
+#define SCREEN_HEIGHT   800
 // Some colors
 #define WHITE 0xFF,0xFF,0xFF,0xFF
 #define BLACK 0x00,0x00,0x00,0xFF
-#define POINT_COLOR BLACK 
-#define LINE_COLOR 0x00,0xFF,0x00,0xFF
+#define POINT_COLOR 0xCC,0x25,0x29,0xFF 
+#define LINE_COLOR 0x39,0x6A,0xB1,0xFF
 
-#define MAX_POINTS 10
+#define MAX_POINTS 5 
+#define SIZE_POINTS 20
+#define HALF_SIZE_POINTS SIZE_POINTS/2
+#define LINE_SIZE HALF_SIZE_POINTS
 typedef struct point {
     float x;
     float y;
@@ -25,6 +26,7 @@ typedef struct point {
 double distance(Point p1, Point p2) {
     return sqrt(pow(p1.x-p2.x,2)+pow(p1.y-p2.y,2));
 }
+
 
 void afficher(Point p){
     printf("x : %f y : %f\n",p.x,p.y);
@@ -43,11 +45,22 @@ Point Plerp(Point p1, Point p2, float t) {
     return p3;
 }
 
+Point BezierPoint(int n, float t, Point P[], size_t kfirst, size_t klast){
+    if ( n == 2 ) {
+        return Plerp(P[kfirst], P[klast], t ); 
+    }
+    else {
+        return Plerp(BezierPoint(n-1,t,P, kfirst,kfirst+1),
+                     BezierPoint(n-1,t,P, klast-1,klast)  , t ) ;
+    }
+}
+
+
 void redefineRectPoints(Point p,SDL_Rect* Rect) {
     Rect->x=p.x;
     Rect->y=p.y;
-    Rect->w=10;
-    Rect->h=10;
+    Rect->w=SIZE_POINTS;
+    Rect->h=SIZE_POINTS;
 }
 int main(void){
 
@@ -62,7 +75,7 @@ int main(void){
                                           SDL_WINDOWPOS_UNDEFINED,
                                           SDL_WINDOWPOS_UNDEFINED,
                                           SCREEN_WIDTH, SCREEN_HEIGHT,
-                                          SDL_WINDOW_SHOWN);
+                                          SDL_WINDOW_SHOWN|SDL_WINDOW_RESIZABLE);
     if(!window)
     {
        fprintf(stderr, "SDL window failed to initialise: %s\n", SDL_GetError());
@@ -82,32 +95,30 @@ int main(void){
     Point p[MAX_POINTS];
 
     int npoints=0;
-    for (size_t k=0;k<npoints;k++){
-        afficher(p[k]);
-    }
     SDL_Rect RectPoints[MAX_POINTS];
-    for (size_t k=0;k<npoints;k++){
-        redefineRectPoints(p[k],&RectPoints[k]);
-    }
     bool quit = false;
     SDL_Event e;
     while(!quit)
     {
-
         SDL_PollEvent(&e);
-
         // check for messages
         switch (e.type) {
             case SDL_MOUSEBUTTONDOWN:
                  switch (e.button.button) {
                     case SDL_BUTTON_LEFT:
-                        p[npoints].x=e.motion.x;
-                        p[npoints].y=e.motion.y;
-                        for (size_t k=0;k<npoints;k++){
-                            redefineRectPoints(p[k],&RectPoints[k]);
+                        int tmpx,tmpy;
+                        SDL_GetMouseState(&tmpx, &tmpy);
+                        p[npoints%MAX_POINTS].x=(float)(tmpx);
+                        p[npoints%MAX_POINTS].y=(float)(tmpy);
+                        redefineRectPoints(p[npoints%MAX_POINTS],&RectPoints[npoints%MAX_POINTS]);
+                        for(size_t k=0;k<MIN(npoints,MAX_POINTS);++k){
+                            afficher(p[k]);
                         }
+                        printf("last pt :%d ",npoints%MAX_POINTS);
+                        afficher(p[npoints]);
+                        putchar('\n');
                         npoints++;
-                         break;
+                        break;
                   }
                 break;
             case SDL_QUIT :
@@ -126,25 +137,62 @@ int main(void){
         SDL_SetRenderDrawColor(renderer, WHITE);
         // Clear screen
         SDL_RenderClear(renderer);
-        // Set renderer color for the goban  
+        // Set renderer color Point
         SDL_SetRenderDrawColor(renderer, POINT_COLOR);
-        // Draw filled goban 
-        for (size_t k=0;k<npoints;k++){
+        // Draw filled rect Points
+        for (size_t k=0;k<MIN(npoints,MAX_POINTS);++k){
             SDL_RenderFillRect(renderer, &RectPoints[k]);
         }
         SDL_SetRenderDrawColor(renderer, LINE_COLOR);
         SDL_Rect line;
-        for (float t=0.0;t<=1.0;t=t+0.001){
-            Point pout=Plerp ( Plerp( Plerp( Plerp(p[0],p[1],t) , Plerp(p[1],p[2],t) , t ) ,
-                                      Plerp( Plerp(p[1],p[2],t) , Plerp(p[2],p[3],t) , t ) , t ) , 
-                               Plerp( Plerp( Plerp(p[1],p[2],t) , Plerp(p[2],p[3],t) , t ) ,
-                                      Plerp( Plerp(p[2],p[3],t) , Plerp(p[3],p[4],t) , t ) , t ), t ) ;
-            line.w=5;
-            line.h=5;
-            line.x=pout.x;
-            line.y=pout.y;
-            //printf("x : %d y: %d \n",line.x,line.y);
-            SDL_RenderFillRect(renderer,&line);
+        Point pout,pout2;
+        if (npoints > 1 ) {
+            for (float t=0.0;t<=1.0;t=t+0.001){
+                pout2 = BezierPoint(npoints,t,p,0,npoints);
+                if (npoints == 2 ) {
+                    pout = Plerp(p[0],p[1],t);
+                    printf("Plerp :");
+                    afficher(pout);
+                    printf("Recursif :");
+                    afficher(pout2);
+                }
+                else if (npoints == 3) {
+
+                    pout = Plerp( Plerp(p[0],p[1],t) ,
+                                  Plerp(p[1],p[2],t) , t );
+                }
+                else if (npoints == 4) {
+                    pout = Plerp ( Plerp( Plerp(p[0],p[1],t) ,
+                                          Plerp(p[1],p[2],t) , t ) , 
+                                   Plerp( Plerp(p[1],p[2],t) ,
+                                          Plerp(p[2],p[3],t) , t ) , t ) ;
+                }
+                else if (npoints == 5) {
+                     pout=Plerp ( Plerp( Plerp( Plerp(p[0],p[1],t) , Plerp(p[1],p[2],t) , t ) ,
+                                         Plerp( Plerp(p[1],p[2],t) , Plerp(p[2],p[3],t) , t ) , t ) , 
+                                  Plerp( Plerp( Plerp(p[1],p[2],t) , Plerp(p[2],p[3],t) , t ) ,
+                                         Plerp( Plerp(p[2],p[3],t) , Plerp(p[3],p[4],t) , t ) , t ), t ) ;
+                }
+                /*
+                else if (npoints >= 6) {
+                     pout=
+                          Plerp ( Plerp ( Plerp( Plerp( Plerp(p[0],p[1],t) , Plerp(p[1],p[2],t) , t ) ,
+                                                 Plerp( Plerp(p[1],p[2],t) , Plerp(p[2],p[3],t) , t ) , t ) , 
+                                          Plerp( Plerp( Plerp(p[1],p[2],t) , Plerp(p[2],p[3],t) , t ) ,
+                                                 Plerp( Plerp(p[2],p[3],t) , Plerp(p[3],p[4],t) , t ) , t ), t ) , 
+                                  Plerp ( Plerp( Plerp( Plerp(p[0],p[1],t) , Plerp(p[1],p[2],t) , t ) ,
+                                                 Plerp( Plerp(p[1],p[2],t) , Plerp(p[2],p[3],t) , t ) , t ) , 
+                                          Plerp( Plerp( Plerp(p[1],p[2],t) , Plerp(p[3],p[4],t) , t ) ,
+                                                 Plerp( Plerp(p[3],p[4],t) , Plerp(p[4],p[5],t) , t ) , t ), t ) , t ) ;
+                }
+                */
+                line.w=LINE_SIZE;
+                line.h=LINE_SIZE;
+                line.x=pout.x+HALF_SIZE_POINTS;
+                line.y=pout.y+HALF_SIZE_POINTS;
+                //printf("x : %d y: %d \n",line.x,line.y);
+                SDL_RenderFillRect(renderer,&line);
+                }
         }
         // Update screen
         SDL_RenderPresent(renderer);
@@ -157,7 +205,6 @@ int main(void){
     SDL_DestroyWindow(window);
     // Quit SDL
     SDL_Quit();
-
 
     return 0;
 }
