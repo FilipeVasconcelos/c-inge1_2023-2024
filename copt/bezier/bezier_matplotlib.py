@@ -1,6 +1,9 @@
 import sys
 import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+print("start")
 # ------------------------------------------------------------------------------
 # Linear interpolation entre deux valeurs 
 # a et b paramétrée par t. 
@@ -160,6 +163,7 @@ ax.set_xlim(xlim)
 ax.set_ylim(ylim)
 movepts=[]
 for points in bezierCircle:
+    print(points)
     movepts.append(plotBezierCurve(points,fig,ax,color=colors[0]))
     print(movepts[-1],movepts[-1].points[0])
 ax.set_aspect('equal')
