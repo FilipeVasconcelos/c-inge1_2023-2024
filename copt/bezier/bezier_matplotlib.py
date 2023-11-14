@@ -1,8 +1,9 @@
 import sys
 import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from color import Color
-
 # ------------------------------------------------------------------------------
 # Linear interpolation entre deux valeurs 
 # a et b paramétrée par t. 
