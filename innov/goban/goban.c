@@ -17,6 +17,8 @@
 // Define screen dimensions
 //#define SCREEN_WIDTH    800
 //#define SCREEN_HEIGHT   600
+#define MIN_SCREEN_W   800
+#define MIN_SCREEN_H   600
 int screen_width=800;
 int screen_height=600;
 
@@ -26,10 +28,15 @@ typedef struct Vec2D{
 
 //SIZE of STONE 
 #define STONE_SIZE 0.45 
-#define STONE_COLOR_BLACK 0x16,0x15,0x1b,0xFF
-#define STONE_COLOR_WHITE 0xDD,0xDB,0xDE,0xFF
+#define BLACK_STONE_COLOR 0x16,0x15,0x1b,0xFF
+#define WHITE_STONE_COLOR 0xEF,0xED,0xEF,0xFF
+#define BLACK_STONE_STROKE 0x36,0x25,0x2b,0xFF
+#define WHITE_STONE_STROKE 0xAE,0xBD,0xAF,0xFF
 typedef struct Stone{
-    Vec2D pos;
+    int x;
+    int y;
+    int linex;
+    int liney;
     int color;
 } Stone;
 
@@ -43,6 +50,7 @@ typedef struct Size{
 #define OFFSET 36
 #define RHOSHI 3 
 typedef struct Goban{
+    int size;
     SDL_Rect outer;
     SDL_Rect inner;
     Vec2D offset;
@@ -52,6 +60,7 @@ typedef struct Goban{
 
 void set_goban(Goban * goban,int w, int h)
 {
+    goban->size    = N;
     goban->outer.w = MIN(w,h) * 0.75 ;
     goban->outer.h = MIN(w,h) * 0.75;
     goban->outer.x = w / 2 - goban->outer.w / 2;
@@ -67,27 +76,35 @@ void set_goban(Goban * goban,int w, int h)
     goban->inner.y=goban->outer.y+goban->offset.y;
 }
 
-int get_pos (int i, char key,Goban goban){
-    return (key=='x') ? goban.inner.x+i*goban.cellsize.w : 
-                        goban.inner.y+i*goban.cellsize.h;
+int get_pos(int line, char key,Goban goban){
+    return (key=='x') ? goban.inner.x+line*goban.cellsize.w : 
+                        goban.inner.y+line*goban.cellsize.h;
 }
 
-int get_index(int mousepos,char key,Goban goban) {
-    return (key=='x') ? (mousepos-goban.inner.x)/goban.cellsize.w :
-                        (mousepos-goban.inner.y)/goban.cellsize.h;
+// get line from position key if 'x' or 'y' direction
+// check the position compare to half of the cell
+int get_line(int pos,char key,Goban goban) {
+    int line,diff,half;
+    diff=(key=='x') ? (pos-goban.inner.x) : (pos-goban.inner.y);
+    half=(key=='x') ? (diff%goban.cellsize.w > goban.cellsize.w*0.5) ? 1 : 0 :
+                      (diff%goban.cellsize.h > goban.cellsize.h*0.5) ? 1 : 0 ;
+    line=(key=='x') ? diff/goban.cellsize.w :
+                      diff/goban.cellsize.h ;
+ 
+    return ((line>=0)&&(line<goban.size)) ? line+half : -1;
 }
 
-// linear interpolation
-int lerp(int a,int b, float t){
-    return a+(b-a)*t;
+// return false if linex and liney was already played
+int linefree(int n,Stone st[],int linex,int liney)
+{
+    for (size_t i=0;i<n;++i){
+        if ( ( linex == st[i].linex) && ( liney == st[i].liney) ){
+            return 0;
+        }
+    }
+    return 1;
 }
-// linear interpolation between two colors
-SDL_Color get_lerp(SDL_Color c1, SDL_Color c2, float t){
-    SDL_Color r={lerp(c1.r,c2.r,t),
-            lerp(c1.g,c2.g,t),
-            lerp(c1.b,c2.b,t)};
-    return r;
-}
+
 
 #define NMAX_SEQUENCE N*N // NxN goban 
 
@@ -111,9 +128,9 @@ int main(int argc, char* argv[])
         return 2;
     }
     // Create window
-    SDL_Window *window = SDL_CreateWindow("Exemple SDL2 Parcours Innovation",
-                                          SDL_WINDOWPOS_UNDEFINED,
-                                          SDL_WINDOWPOS_UNDEFINED,
+    SDL_Window *window = SDL_CreateWindow("CGoban v0.1",
+                                          SDL_WINDOWPOS_CENTERED,
+                                          SDL_WINDOWPOS_CENTERED,
                                           screen_width,screen_height,
                                           SDL_WINDOW_RESIZABLE);
     if(!window)
@@ -121,6 +138,9 @@ int main(int argc, char* argv[])
        fprintf(stderr, "SDL window failed to initialise: %s\n", SDL_GetError());
        return 1;
     }
+    SDL_SetWindowMinimumSize(window, MIN_SCREEN_W, MIN_SCREEN_H);
+	// setting minimum size might move the window, so set position again
+	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     // Create renderer
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if(!renderer)
@@ -131,7 +151,7 @@ int main(int argc, char* argv[])
     //SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     //this opens a font style and sets a size
-    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/freefont/FreeMono.ttf", 12);
+    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/freefont/FreeMono.ttf", 14);
     if(!font) 
     {
         fprintf(stderr,"TTF_OpenFont failed to initialise: %s\n",SDL_GetError());
@@ -166,6 +186,7 @@ int main(int argc, char* argv[])
 
     Stone st[NMAX_SEQUENCE];
     Vec2D mousepos;
+    Vec2D line;
     int played=0;
     bool quit = false;
     SDL_Event e;
@@ -179,13 +200,18 @@ int main(int argc, char* argv[])
             case SDL_MOUSEBUTTONDOWN:
                  switch (e.button.button) {
                     case SDL_BUTTON_LEFT:
-                        mousepos.x=get_index(e.motion.x,'x',board);
-                        mousepos.y=get_index(e.motion.y,'y',board);
-                        st[played].pos.x=get_pos(mousepos.x,'x',board);
-                        st[played].pos.y=get_pos(mousepos.y,'y',board);
-                        printf("st inside %d %d\n",st[played].pos.x,st[played].pos.y);
-                        played++;
-                        printf("test %d %d %d %d %d\n",e.motion.x,e.motion.y,mousepos.x,mousepos.y,played);
+                        line.x=get_line(e.motion.x,'x',board);
+                        line.y=get_line(e.motion.y,'y',board);
+                        //printf("mouse pos : %d %d line predicted: %d %d coord px of line (0,0) %d %d\n",e.motion.x,e.motion.y,line.x,line.y,get_pos(0,'x',board),get_pos(0,'y',board));
+                        if ( (line.x>=0) && (line.y>=0) && (linefree(played,st,line.x,line.y)) ) {
+                            st[played].linex=line.x;
+                            st[played].liney=line.y;
+                            st[played].x=get_pos(line.x,'x',board);
+                            st[played].y=get_pos(line.y,'y',board);
+                            printf("line predicted : %d %d st inside %d %d\n",line.x,line.y,st[played].x,st[played].y);
+                            played++;
+                        }
+                        //printf("test %d %d %d %d %d\n",e.motion.x,e.motion.y,line.x,line.y,played);
                         //SDL_ShowSimpleMessageBox(0, "Mouse", "Left button was pressed!", window);
                         break;
                     case SDL_BUTTON_RIGHT:
@@ -196,7 +222,14 @@ int main(int argc, char* argv[])
             case SDL_WINDOWEVENT:
                 if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
                     SDL_GetWindowSize(window,&screen_width,&screen_height);
+                    if (screen_width<MIN_SCREEN_W) screen_width=MIN_SCREEN_W;
+                    if (screen_height<MIN_SCREEN_H) screen_height=MIN_SCREEN_H;
+                    SDL_SetWindowSize(window,screen_width,screen_height);
                     set_goban(&board,screen_width,screen_height);
+                    for (size_t i=0;i<played;++i){
+                        st[i].x=get_pos(st[i].linex,'x',board);
+                        st[i].y=get_pos(st[i].liney,'y',board);
+                    }
                     printf("here event %d %d\n",board.outer.w,board.outer.h);
                     }
                 break;
@@ -212,7 +245,6 @@ int main(int argc, char* argv[])
             	default:
                 	break;
         }
-
         // Initialize renderer color white for the background
         SDL_SetRenderDrawColor(renderer, WHITE);
         // Clear screen
@@ -257,10 +289,14 @@ int main(int argc, char* argv[])
             }
         }
          for (size_t i=0;i<played;++i){
-            //printf("outside %d %d %d\n",i,st[i].pos.x,st[i].pos.y);
-            (i%2==0) ? SDL_SetRenderDrawColor(renderer, STONE_COLOR_BLACK) : SDL_SetRenderDrawColor(renderer, STONE_COLOR_WHITE);
-            SDL_RenderFillCircle(renderer,st[i].pos.x,st[i].pos.y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
+            //printf("outside %d %d %d\n",i,st[i].x,st[i].y);
+            (i%2==0) ? SDL_SetRenderDrawColor(renderer, BLACK_STONE_COLOR) : SDL_SetRenderDrawColor(renderer, WHITE_STONE_COLOR);
+            SDL_RenderFillCircle(renderer,st[i].x,st[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
+            (i%2==0) ? SDL_SetRenderDrawColor(renderer, BLACK_STONE_STROKE) : SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
+            SDL_RenderDrawCircle(renderer,st[i].x,st[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
          }
+            (played%2==0) ? SDL_SetRenderDrawColor(renderer, WHITE_STONE_STROKE):SDL_SetRenderDrawColor(renderer,BLACK_STONE_STROKE);
+            SDL_RenderDrawCircle(renderer,st[played].x,st[played].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE-10);
         // Update screen
         SDL_RenderPresent(renderer);
     }
