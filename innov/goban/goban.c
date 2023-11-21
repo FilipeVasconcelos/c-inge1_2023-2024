@@ -1,4 +1,6 @@
+#define _GNU_SOURCE
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
 
@@ -7,6 +9,10 @@
 
 #include "draw_circle.h"
 
+#define BLOCK_SIZE 24
+#define BLOCK_COUNT 10
+
+#define MAX_LEN 300
 // Define MAX and MIN macros
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
@@ -26,12 +32,17 @@ typedef struct Vec2D{
     int x,y;
 } Vec2D;
 
+size_t sgftoline(char c){
+    return (size_t) c - (size_t) 'a';
+}
+
 //SIZE of STONE 
 #define STONE_SIZE 0.45 
+#define MARK_SIZE 0.21
 #define BLACK_STONE_COLOR 0x16,0x15,0x1b,0xFF
 #define WHITE_STONE_COLOR 0xEF,0xED,0xEF,0xFF
-#define BLACK_STONE_STROKE 0x36,0x25,0x2b,0xFF
-#define WHITE_STONE_STROKE 0xAE,0xBD,0xAF,0xFF
+#define BLACK_STONE_STROKE 0xFE,0xFD,0xFF,0xFF
+#define WHITE_STONE_STROKE 0x36,0x25,0x2b,0xFF
 typedef struct Stone{
     int x;
     int y;
@@ -48,7 +59,7 @@ typedef struct Size{
 #define N 19 // NxN goban 
 #define GOBAN_COLOR 0xEB,0xC6,0x41,0xFF
 #define OFFSET 36
-#define RHOSHI 3 
+#define RHOSHI 5 
 typedef struct Goban{
     int size;
     SDL_Rect outer;
@@ -105,14 +116,76 @@ int linefree(int n,Stone st[],int linex,int liney)
     return 1;
 }
 
+void draw_background(SDL_Renderer *renderer, Goban * goban){
+    // Initialize renderer color white for the background
+    SDL_SetRenderDrawColor(renderer, WHITE);
+    // Clear screen
+    SDL_RenderClear(renderer);
+    // Set renderer color for the goban  
+    SDL_SetRenderDrawColor(renderer, GOBAN_COLOR);
+    // Draw filled goban 
+    SDL_RenderFillRect(renderer, &(goban->outer));
+
+}
+void draw_lines(SDL_Renderer *renderer, Goban board, SDL_Texture* Text_row[N], SDL_Texture* Text_col[N]){
+    // Draw lines, hoshis stars and coordinates
+    SDL_Rect textRect;    
+    SDL_SetRenderDrawColor(renderer, BLACK);
+    for (size_t i=0;i<N;i++){
+        // Draw lines
+        // boucle sur -1 0 1 epaisseur de 3
+        for (int ep=-1;ep<1;++ep)
+        {
+            //lignes horizontales
+            SDL_RenderDrawLine(renderer,get_pos(0,'x',board)+ep,
+                                        get_pos(i,'y',board)+ep,
+                                        get_pos(0,'x',board)+board.inner.w+ep,
+                                        get_pos(i,'y',board)+ep);
+            //lignes verticales
+            SDL_RenderDrawLine(renderer,get_pos(i,'x',board)+ep,
+                                        get_pos(0,'y',board)+ep,
+                                        get_pos(i,'x',board)+ep,
+                                        get_pos(0,'y',board)+board.inner.h+ep);
+        }
+            //draw text 
+            int texW = 0;
+            int texH = 0;
+            SDL_QueryTexture(Text_row[i], NULL, NULL, &texW, &texH);
+            textRect.x=get_pos(i,'x',board)-texW/2;
+            textRect.y=get_pos(0,'y',board)-texH*2;
+            textRect.w=texW;
+            textRect.h=texH;
+            SDL_RenderCopy(renderer, Text_row[i], NULL, &textRect);
+            SDL_QueryTexture(Text_col[18-i], NULL, NULL, &texW, &texH);
+                textRect.x=get_pos(0,'x',board)-texW-10;
+                textRect.y=get_pos(i,'y',board)-texH/2;
+            textRect.w=texW;
+            textRect.h=texH;
+            SDL_RenderCopy(renderer, Text_col[18-i], NULL, &textRect);
+
+            //Points Hoshi 3x3 points
+            if ( (i==3) || (i==9) || (i==15) )
+            {
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(3 ,'y',board),board.rhoshi);
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(9 ,'y',board),board.rhoshi);
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(15,'y',board),board.rhoshi);
+            }
+        }
+}
 
 #define NMAX_SEQUENCE N*N // NxN goban 
 
 int main(int argc, char* argv[])
 {
-    // Unused argc, argv
-    (void) argc;
-    (void) argv;
+    Goban board;
+    set_goban(&board,screen_width,screen_height);
+    Stone st[NMAX_SEQUENCE];
+    size_t played=0;
+    size_t showed=0;
+    int readingfromfile=0;
+    Vec2D line;
+    FILE* fptr;
+    char sgfilename[MAX_LEN];
 
     // Initialize SDL
     if(SDL_Init(SDL_INIT_VIDEO) < 0)
@@ -151,7 +224,19 @@ int main(int argc, char* argv[])
     //SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     //this opens a font style and sets a size
-    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/freefont/FreeMono.ttf", 14);
+    // /usr/share/fonts/truetype/freefont/FreeMono.ttf
+	// /usr/share/fonts/truetype/freefont/FreeMonoBold.ttf
+	// /usr/share/fonts/truetype/freefont/FreeMonoBoldOblique.ttf
+	// /usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf
+	// /usr/share/fonts/truetype/freefont/FreeSans.ttf
+	// /usr/share/fonts/truetype/freefont/FreeSansBold.ttf
+	// /usr/share/fonts/truetype/freefont/FreeSansBoldOblique.ttf
+	// /usr/share/fonts/truetype/freefont/FreeSansOblique.ttf
+	// /usr/share/fonts/truetype/freefont/FreeSerif.ttf
+	// /usr/share/fonts/truetype/freefont/FreeSerifBold.ttf
+	// /usr/share/fonts/truetype/freefont/FreeSerifBoldItalic.ttf
+	// /usr/share/fonts/truetype/freefont/FreeSerifItalic.ttf
+    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", 16);
     if(!font) 
     {
         fprintf(stderr,"TTF_OpenFont failed to initialise: %s\n",SDL_GetError());
@@ -159,147 +244,147 @@ int main(int argc, char* argv[])
     }
     SDL_Color textColor = {0,0,0};
     char row[20] = "ABCDEFGHJKLMNOPQRST"; 
-    SDL_Surface* Surf_row[sizeof(row)];
-    SDL_Surface* Surf_col[sizeof(row)];
+    SDL_Surface* Surf_row[N];
+    SDL_Surface* Surf_col[N];
     char *ptr=malloc(2*sizeof(char));
     char str[3];
     for (size_t i=0;i<N;i++) {
         ptr[0]=row[i];
         ptr[1]='\0';
         Surf_row[i] = TTF_RenderText_Solid(font, ptr,textColor) ;
-        sprintf(str, "%d", i+1);
+        sprintf(str, "%ld", i+1);
         Surf_col[i] = TTF_RenderText_Solid(font, str,textColor) ;
     }
-
     // now you can convert it into a texture
-    SDL_Texture* Text_row[sizeof(row)];
-    SDL_Texture* Text_col[sizeof(row)];
+    SDL_Texture* Text_row[N];
+    SDL_Texture* Text_col[N];
     for (size_t i =0; i<N;i++) {
         Text_row[i]=SDL_CreateTextureFromSurface(renderer, Surf_row[i]);
         Text_col[i]=SDL_CreateTextureFromSurface(renderer, Surf_col[i]);
     }
-    
-    SDL_Rect textRect;    
-    // Declare a square as Rect 
-    Goban board;
-    set_goban(&board,screen_width,screen_height);
-
-    Stone st[NMAX_SEQUENCE];
-    Vec2D mousepos;
-    Vec2D line;
-    int played=0;
-    bool quit = false;
-    SDL_Event e;
-    while(!quit)
-    {
-
-        SDL_PollEvent(&e);
-
-        // check for messages
-        switch (e.type) {
-            case SDL_MOUSEBUTTONDOWN:
-                 switch (e.button.button) {
-                    case SDL_BUTTON_LEFT:
-                        line.x=get_line(e.motion.x,'x',board);
-                        line.y=get_line(e.motion.y,'y',board);
-                        //printf("mouse pos : %d %d line predicted: %d %d coord px of line (0,0) %d %d\n",e.motion.x,e.motion.y,line.x,line.y,get_pos(0,'x',board),get_pos(0,'y',board));
-                        if ( (line.x>=0) && (line.y>=0) && (linefree(played,st,line.x,line.y)) ) {
-                            st[played].linex=line.x;
-                            st[played].liney=line.y;
-                            st[played].x=get_pos(line.x,'x',board);
-                            st[played].y=get_pos(line.y,'y',board);
-                            printf("line predicted : %d %d st inside %d %d\n",line.x,line.y,st[played].x,st[played].y);
-                            played++;
-                        }
-                        //printf("test %d %d %d %d %d\n",e.motion.x,e.motion.y,line.x,line.y,played);
-                        //SDL_ShowSimpleMessageBox(0, "Mouse", "Left button was pressed!", window);
-                        break;
-                    case SDL_BUTTON_RIGHT:
-                        SDL_ShowSimpleMessageBox(0, "Mouse", "Right button was pressed!", window);
-                        break;
-                  }
-                break;
-            case SDL_WINDOWEVENT:
-                if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
-                    SDL_GetWindowSize(window,&screen_width,&screen_height);
-                    if (screen_width<MIN_SCREEN_W) screen_width=MIN_SCREEN_W;
-                    if (screen_height<MIN_SCREEN_H) screen_height=MIN_SCREEN_H;
-                    SDL_SetWindowSize(window,screen_width,screen_height);
-                    set_goban(&board,screen_width,screen_height);
-                    for (size_t i=0;i<played;++i){
-                        st[i].x=get_pos(st[i].linex,'x',board);
-                        st[i].y=get_pos(st[i].liney,'y',board);
-                    }
-                    printf("here event %d %d\n",board.outer.w,board.outer.h);
-                    }
-                break;
-            case SDL_QUIT :
-                quit = 1; 
-                break;
-            case SDL_KEYDOWN:
-                switch(e.key.keysym.sym) {
-                    case SDLK_q:
-                        quit = 1;
-                        break;
-                    }
-            	default:
-                	break;
+    // if reading from file
+    if (argc > 1 ) {
+        printf("reading sgf file %s\n",*(argv+1));
+        readingfromfile=1;
+        strcpy(sgfilename,*(argv+1));
+        fptr=fopen(sgfilename,"r");
+        if ( ! fptr ) {
+            fprintf( stderr, "Cannot open file for reading\n" );
+            exit(-1);
         }
-        // Initialize renderer color white for the background
-        SDL_SetRenderDrawColor(renderer, WHITE);
-        // Clear screen
-        SDL_RenderClear(renderer);
-        // Set renderer color for the goban  
-        SDL_SetRenderDrawColor(renderer, GOBAN_COLOR);
-        // Draw filled goban 
-        SDL_RenderFillRect(renderer, &board.outer);
-
-        // Draw lines, hoshis stars and coordinates
-        SDL_SetRenderDrawColor(renderer, BLACK);
-        for (size_t i=0;i<N;i++){
-            SDL_RenderDrawLine(renderer,get_pos(0,'x',board),
-                                        get_pos(i,'y',board),
-                                        get_pos(0,'x',board)+board.inner.w,
-                                        get_pos(i,'y',board));
-
-            SDL_RenderDrawLine(renderer,get_pos(i,'x',board),
-                                        get_pos(0,'y',board),
-                                        get_pos(i,'x',board),
-                                        get_pos(0,'y',board)+board.inner.h);
-            int texW = 0;
-            int texH = 0;
-            SDL_QueryTexture(Text_row[i], NULL, NULL, &texW, &texH);
-            textRect.x=get_pos(i,'x',board)-texW/2;
-            textRect.y=get_pos(0,'y',board)-texH*2;
-            textRect.w=texW;
-            textRect.h=texH;
-            SDL_RenderCopy(renderer, Text_row[i], NULL, &textRect);
-            SDL_QueryTexture(Text_col[18-i], NULL, NULL, &texW, &texH);
-            textRect.x=get_pos(0,'x',board)-texH*2;
-            textRect.y=get_pos(i,'y',board)-texW/2;
-            textRect.w=texW;
-            textRect.h=texH;
-            SDL_RenderCopy(renderer, Text_col[18-i], NULL, &textRect);
-            //Points Hoshi 3x3 points
-            if ( (i==3) || (i==9) || (i==15) )
-            {
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(3 ,'y',board),board.rhoshi);
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(9 ,'y',board),board.rhoshi);
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(15,'y',board),board.rhoshi);
+        char * rline = NULL;
+        size_t len = 0;
+        while(getline(&rline, &len, fptr) != -1) {
+            printf("line length: %zd\n", strlen(rline));
+            printf("%s",rline);
+            if (strlen(rline) == 7 ){
+                st[played].linex=sgftoline(rline[3]);
+                st[played].liney=sgftoline(rline[4]);
+                st[played].x=get_pos(st[played].linex,'x',board);
+                st[played].y=get_pos(st[played].liney,'y',board);
+                printf("%ld %d %d %d %d\n",played,st[played].linex,st[played].linex,st[played].x,st[played].y);
+                played++;
             }
         }
-         for (size_t i=0;i<played;++i){
-            //printf("outside %d %d %d\n",i,st[i].x,st[i].y);
+
+    
+        int returnCode = fclose( fptr );
+        free(rline);
+        if ( returnCode == EOF ) {
+            fprintf( stderr, "Cannot close file\n" );
+            exit( -1 );
+        }
+    }
+    Vec2D mousepos;
+    bool quit = false;
+    SDL_Event e;
+    // background
+    draw_background(renderer,&board);
+    //lines+hoshis+coordinates
+    draw_lines(renderer,board,Text_row,Text_col);
+    while(!quit)
+    {
+        if (SDL_WaitEvent(&e) != 0) {
+            // check for messages
+            switch (e.type) {
+                case SDL_MOUSEBUTTONDOWN:
+                     switch (e.button.button) {
+                        case SDL_BUTTON_LEFT:
+                            printf("readingformfile %d",readingfromfile);
+                            if (readingfromfile) break;
+                            line.x=get_line(e.motion.x,'x',board);
+                            line.y=get_line(e.motion.y,'y',board);
+                            if ( (line.x>=0)                && 
+                                 (line.y>=0)                && 
+                                 (line.x<board.size)        && 
+                                 (line.y<board.size)        && 
+                                 (linefree(played,st,line.x,line.y)) ) {
+                                st[played].linex=line.x;
+                                st[played].liney=line.y;
+                                st[played].x=get_pos(line.x,'x',board);
+                                st[played].y=get_pos(line.y,'y',board);
+                                played++;
+                            }
+                            break;
+                        case SDL_BUTTON_RIGHT:
+                            SDL_ShowSimpleMessageBox(0, "Mouse", "Right button was pressed!", window);
+                            break;
+                      }
+                    break;
+                case SDL_WINDOWEVENT:
+                    if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
+                        SDL_GetWindowSize(window,&screen_width,&screen_height);
+                        if (screen_width<MIN_SCREEN_W) screen_width=MIN_SCREEN_W;
+                        if (screen_height<MIN_SCREEN_H) screen_height=MIN_SCREEN_H;
+                        SDL_SetWindowSize(window,screen_width,screen_height);
+                        set_goban(&board,screen_width,screen_height);
+                        draw_background(renderer,&board);
+                        //lines+hoshis+coordinates
+                        draw_lines(renderer,board,Text_row,Text_col);
+                        //reset position in pixel from new board size
+                        for (size_t i=0;i<played;++i){
+                            st[i].x=get_pos(st[i].linex,'x',board);
+                            st[i].y=get_pos(st[i].liney,'y',board);
+                        }
+                        //printf("here event %d %d\n",board.outer.w,board.outer.h);
+                        }
+                    break;
+                case SDL_QUIT :
+                    quit = 1; 
+                    break;
+                case SDL_KEYDOWN:
+                    switch(e.key.keysym.sym) {
+                        case SDLK_q:
+                            quit = 1;
+                            break;
+                        case SDLK_SPACE:
+                            (showed+1<played) ? showed++ : showed;
+                            //printf("showed %ld",showed);
+                            break;
+                        case SDLK_r:
+                            (showed>0) ? showed-- : showed;
+                            //printf("showed %ld",showed);
+                            break;
+                    }
+               	default:
+                   	break;
+            }
+        }
+        //draw stones
+        for (size_t i=0;i<showed;++i){
             (i%2==0) ? SDL_SetRenderDrawColor(renderer, BLACK_STONE_COLOR) : SDL_SetRenderDrawColor(renderer, WHITE_STONE_COLOR);
             SDL_RenderFillCircle(renderer,st[i].x,st[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
-            (i%2==0) ? SDL_SetRenderDrawColor(renderer, BLACK_STONE_STROKE) : SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
+            SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
             SDL_RenderDrawCircle(renderer,st[i].x,st[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
-         }
-            (played%2==0) ? SDL_SetRenderDrawColor(renderer, WHITE_STONE_STROKE):SDL_SetRenderDrawColor(renderer,BLACK_STONE_STROKE);
-            SDL_RenderDrawCircle(renderer,st[played].x,st[played].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE-10);
+            SDL_RenderDrawCircle(renderer,st[i].x,st[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE-1);
+        }
+        ((showed-1)%2==0) ? SDL_SetRenderDrawColor(renderer,BLACK_STONE_STROKE):
+                            SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
+        SDL_RenderDrawCircle(renderer,st[showed-1].x,st[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE);
+        SDL_RenderDrawCircle(renderer,st[showed-1].x,st[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE+1);
         // Update screen
         SDL_RenderPresent(renderer);
-    }
+    } // quit loop
     //free memory
     for (size_t i=0; i<N;i++) {
         SDL_DestroyTexture(Text_row[i]);
