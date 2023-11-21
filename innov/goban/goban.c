@@ -46,9 +46,9 @@ size_t sgftoline(char c){
 typedef struct Stone{
     int x;
     int y;
-    int linex;
-    int liney;
-    int color;
+    size_t linex;
+    size_t liney;
+//    int color;
 } Stone;
 
 typedef struct Size{
@@ -56,7 +56,8 @@ typedef struct Size{
     int h;
 }Size;
 
-#define N 19 // NxN goban 
+#define N 13 // NxN goban 
+#define NMAX_SEQUENCE N*N // NxN goban 
 #define GOBAN_COLOR 0xEB,0xC6,0x41,0xFF
 #define OFFSET 36
 #define RHOSHI 5 
@@ -87,15 +88,25 @@ void set_goban(Goban * goban,int w, int h)
     goban->inner.y=goban->outer.y+goban->offset.y;
 }
 
-int get_pos(int line, char key,Goban goban){
+bool hoshi(int i, int n) {
+    if ( n==9 )  return (i==2) || (i==8);
+    if ( n==13 ) return (i==3) || (i==9) ;
+    if ( n==19 ) return (i==3) || (i==9) || (i==15);
+}
+
+
+// get pixel position from line :
+// line is a size_t between 1 and 19 
+// key is 'x' or 'y'
+int get_pos(size_t line, char key, Goban goban){
     return (key=='x') ? goban.inner.x+line*goban.cellsize.w : 
                         goban.inner.y+line*goban.cellsize.h;
 }
 
 // get line from position key if 'x' or 'y' direction
 // check the position compare to half of the cell
-int get_line(int pos,char key,Goban goban) {
-    int line,diff,half;
+size_t get_line(int pos, char key, Goban goban) {
+    size_t line,diff,half;
     diff=(key=='x') ? (pos-goban.inner.x) : (pos-goban.inner.y);
     half=(key=='x') ? (diff%goban.cellsize.w > goban.cellsize.w*0.5) ? 1 : 0 :
                       (diff%goban.cellsize.h > goban.cellsize.h*0.5) ? 1 : 0 ;
@@ -105,18 +116,31 @@ int get_line(int pos,char key,Goban goban) {
     return ((line>=0)&&(line<goban.size)) ? line+half : -1;
 }
 
-// return false if linex and liney was already played
-int linefree(int n,Stone st[],int linex,int liney)
-{
-    for (size_t i=0;i<n;++i){
-        if ( ( linex == st[i].linex) && ( liney == st[i].liney) ){
-            return 0;
-        }
-    }
-    return 1;
+
+void set_line_and_pos(Stone *st, size_t linex, size_t liney , Goban goban){
+    st->linex=linex;
+    st->liney=liney;
+    st->x=get_pos(linex,'x',goban);
+    st->y=get_pos(liney,'y',goban);
 }
 
-void draw_background(SDL_Renderer *renderer, Goban * goban){
+
+// return false if linex and liney was already played
+bool linefree(size_t n,Stone stones[],size_t linex,size_t liney)
+{
+    for (size_t i=0;i<n;++i){
+        if ( ( linex == stones[i].linex) && ( liney == stones[i].liney) ){
+            return false;
+        }
+    }
+    return true;
+}
+/******************************************************************************
+ * draw all background, lines, coordinates, hoshis
+ *****************************************************************************/
+void draw_background(SDL_Renderer *renderer, Goban *goban, SDL_Texture* Text_row[N], SDL_Texture* Text_col[N])
+{
+    SDL_Rect textRect;    
     // Initialize renderer color white for the background
     SDL_SetRenderDrawColor(renderer, WHITE);
     // Clear screen
@@ -125,11 +149,7 @@ void draw_background(SDL_Renderer *renderer, Goban * goban){
     SDL_SetRenderDrawColor(renderer, GOBAN_COLOR);
     // Draw filled goban 
     SDL_RenderFillRect(renderer, &(goban->outer));
-
-}
-void draw_lines(SDL_Renderer *renderer, Goban board, SDL_Texture* Text_row[N], SDL_Texture* Text_col[N]){
     // Draw lines, hoshis stars and coordinates
-    SDL_Rect textRect;    
     SDL_SetRenderDrawColor(renderer, BLACK);
     for (size_t i=0;i<N;i++){
         // Draw lines
@@ -137,52 +157,51 @@ void draw_lines(SDL_Renderer *renderer, Goban board, SDL_Texture* Text_row[N], S
         for (int ep=-1;ep<1;++ep)
         {
             //lignes horizontales
-            SDL_RenderDrawLine(renderer,get_pos(0,'x',board)+ep,
-                                        get_pos(i,'y',board)+ep,
-                                        get_pos(0,'x',board)+board.inner.w+ep,
-                                        get_pos(i,'y',board)+ep);
+            SDL_RenderDrawLine(renderer,get_pos(0,'x',*goban)+ep,
+                                        get_pos(i,'y',*goban)+ep,
+                                        get_pos(0,'x',*goban)+goban->inner.w+ep,
+                                        get_pos(i,'y',*goban)+ep);
             //lignes verticales
-            SDL_RenderDrawLine(renderer,get_pos(i,'x',board)+ep,
-                                        get_pos(0,'y',board)+ep,
-                                        get_pos(i,'x',board)+ep,
-                                        get_pos(0,'y',board)+board.inner.h+ep);
+            SDL_RenderDrawLine(renderer,get_pos(i,'x',*goban)+ep,
+                                        get_pos(0,'y',*goban)+ep,
+                                        get_pos(i,'x',*goban)+ep,
+                                        get_pos(0,'y',*goban)+goban->inner.h+ep);
         }
             //draw text 
             int texW = 0;
             int texH = 0;
             SDL_QueryTexture(Text_row[i], NULL, NULL, &texW, &texH);
-            textRect.x=get_pos(i,'x',board)-texW/2;
-            textRect.y=get_pos(0,'y',board)-texH*2;
+            textRect.x=get_pos(i,'x',*goban)-texW/2;
+            textRect.y=get_pos(0,'y',*goban)-texH*2+10;
             textRect.w=texW;
             textRect.h=texH;
             SDL_RenderCopy(renderer, Text_row[i], NULL, &textRect);
             SDL_QueryTexture(Text_col[18-i], NULL, NULL, &texW, &texH);
-                textRect.x=get_pos(0,'x',board)-texW-10;
-                textRect.y=get_pos(i,'y',board)-texH/2;
+                textRect.x=get_pos(0,'x',*goban)-texW-10;
+                textRect.y=get_pos(i,'y',*goban)-texH/2;
             textRect.w=texW;
             textRect.h=texH;
             SDL_RenderCopy(renderer, Text_col[18-i], NULL, &textRect);
 
             //Points Hoshi 3x3 points
-            if ( (i==3) || (i==9) || (i==15) )
+            if ( hoshi(i,N, goba) )
             {
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(3 ,'y',board),board.rhoshi);
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(9 ,'y',board),board.rhoshi);
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',board),get_pos(15,'y',board),board.rhoshi);
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(3 ,'y',*goban),goban->rhoshi);
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(9 ,'y',*goban),goban->rhoshi);
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(15,'y',*goban),goban->rhoshi);
             }
         }
 }
 
-#define NMAX_SEQUENCE N*N // NxN goban 
 
 int main(int argc, char* argv[])
 {
     Goban board;
     set_goban(&board,screen_width,screen_height);
-    Stone st[NMAX_SEQUENCE];
+    Stone stones[NMAX_SEQUENCE];
     size_t played=0;
     size_t showed=0;
-    int readingfromfile=0;
+    bool readingfromfile=false;
     Vec2D line;
     FILE* fptr;
     char sgfilename[MAX_LEN];
@@ -221,21 +240,7 @@ int main(int argc, char* argv[])
         fprintf(stderr,"SDL_Create_Rendeder failed to initialise: %s\n",SDL_GetError());
         return 1;
     }
-    //SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-    //this opens a font style and sets a size
-    // /usr/share/fonts/truetype/freefont/FreeMono.ttf
-	// /usr/share/fonts/truetype/freefont/FreeMonoBold.ttf
-	// /usr/share/fonts/truetype/freefont/FreeMonoBoldOblique.ttf
-	// /usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf
-	// /usr/share/fonts/truetype/freefont/FreeSans.ttf
-	// /usr/share/fonts/truetype/freefont/FreeSansBold.ttf
-	// /usr/share/fonts/truetype/freefont/FreeSansBoldOblique.ttf
-	// /usr/share/fonts/truetype/freefont/FreeSansOblique.ttf
-	// /usr/share/fonts/truetype/freefont/FreeSerif.ttf
-	// /usr/share/fonts/truetype/freefont/FreeSerifBold.ttf
-	// /usr/share/fonts/truetype/freefont/FreeSerifBoldItalic.ttf
-	// /usr/share/fonts/truetype/freefont/FreeSerifItalic.ttf
     TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", 16);
     if(!font) 
     {
@@ -262,11 +267,13 @@ int main(int argc, char* argv[])
         Text_row[i]=SDL_CreateTextureFromSurface(renderer, Surf_row[i]);
         Text_col[i]=SDL_CreateTextureFromSurface(renderer, Surf_col[i]);
     }
+
     // if reading from file
     if (argc > 1 ) {
         printf("reading sgf file %s\n",*(argv+1));
-        readingfromfile=1;
+        readingfromfile=true;
         strcpy(sgfilename,*(argv+1));
+        //open SGF file
         fptr=fopen(sgfilename,"r");
         if ( ! fptr ) {
             fprintf( stderr, "Cannot open file for reading\n" );
@@ -275,18 +282,14 @@ int main(int argc, char* argv[])
         char * rline = NULL;
         size_t len = 0;
         while(getline(&rline, &len, fptr) != -1) {
-            printf("line length: %zd\n", strlen(rline));
-            printf("%s",rline);
             if (strlen(rline) == 7 ){
-                st[played].linex=sgftoline(rline[3]);
-                st[played].liney=sgftoline(rline[4]);
-                st[played].x=get_pos(st[played].linex,'x',board);
-                st[played].y=get_pos(st[played].liney,'y',board);
-                printf("%ld %d %d %d %d\n",played,st[played].linex,st[played].linex,st[played].x,st[played].y);
+                stones[played].linex=sgftoline(rline[3]);
+                stones[played].liney=sgftoline(rline[4]);
+                stones[played].x=get_pos(stones[played].linex,'x',board);
+                stones[played].y=get_pos(stones[played].liney,'y',board);
                 played++;
             }
         }
-
     
         int returnCode = fclose( fptr );
         free(rline);
@@ -295,13 +298,12 @@ int main(int argc, char* argv[])
             exit( -1 );
         }
     }
+
     Vec2D mousepos;
     bool quit = false;
     SDL_Event e;
     // background
-    draw_background(renderer,&board);
-    //lines+hoshis+coordinates
-    draw_lines(renderer,board,Text_row,Text_col);
+    draw_background(renderer,&board,Text_row,Text_col);
     while(!quit)
     {
         if (SDL_WaitEvent(&e) != 0) {
@@ -310,20 +312,20 @@ int main(int argc, char* argv[])
                 case SDL_MOUSEBUTTONDOWN:
                      switch (e.button.button) {
                         case SDL_BUTTON_LEFT:
-                            printf("readingformfile %d",readingfromfile);
-                            if (readingfromfile) break;
+                            if (readingfromfile) {
+                                break;
+                            }
                             line.x=get_line(e.motion.x,'x',board);
                             line.y=get_line(e.motion.y,'y',board);
                             if ( (line.x>=0)                && 
                                  (line.y>=0)                && 
                                  (line.x<board.size)        && 
                                  (line.y<board.size)        && 
-                                 (linefree(played,st,line.x,line.y)) ) {
-                                st[played].linex=line.x;
-                                st[played].liney=line.y;
-                                st[played].x=get_pos(line.x,'x',board);
-                                st[played].y=get_pos(line.y,'y',board);
+                                 (linefree(played,stones,line.x,line.y)) ) {
+
+                                set_line_and_pos(stones+played,line.x,line.y,board);
                                 played++;
+                                showed++;
                             }
                             break;
                         case SDL_BUTTON_RIGHT:
@@ -338,16 +340,12 @@ int main(int argc, char* argv[])
                         if (screen_height<MIN_SCREEN_H) screen_height=MIN_SCREEN_H;
                         SDL_SetWindowSize(window,screen_width,screen_height);
                         set_goban(&board,screen_width,screen_height);
-                        draw_background(renderer,&board);
-                        //lines+hoshis+coordinates
-                        draw_lines(renderer,board,Text_row,Text_col);
+                        draw_background(renderer,&board,Text_row,Text_col);
                         //reset position in pixel from new board size
                         for (size_t i=0;i<played;++i){
-                            st[i].x=get_pos(st[i].linex,'x',board);
-                            st[i].y=get_pos(st[i].liney,'y',board);
+                            set_line_and_pos(stones+i,stones[i].linex,stones[i].liney,board);
                         }
-                        //printf("here event %d %d\n",board.outer.w,board.outer.h);
-                        }
+                    }
                     break;
                 case SDL_QUIT :
                     quit = 1; 
@@ -358,11 +356,12 @@ int main(int argc, char* argv[])
                             quit = 1;
                             break;
                         case SDLK_SPACE:
-                            (showed+1<played) ? showed++ : showed;
+                            (showed+1<=played) ? showed++ : showed;
                             //printf("showed %ld",showed);
                             break;
                         case SDLK_r:
                             (showed>0) ? showed-- : showed;
+                            draw_background(renderer,&board,Text_row,Text_col);
                             //printf("showed %ld",showed);
                             break;
                     }
@@ -373,15 +372,15 @@ int main(int argc, char* argv[])
         //draw stones
         for (size_t i=0;i<showed;++i){
             (i%2==0) ? SDL_SetRenderDrawColor(renderer, BLACK_STONE_COLOR) : SDL_SetRenderDrawColor(renderer, WHITE_STONE_COLOR);
-            SDL_RenderFillCircle(renderer,st[i].x,st[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
+            SDL_RenderFillCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
             SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
-            SDL_RenderDrawCircle(renderer,st[i].x,st[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
-            SDL_RenderDrawCircle(renderer,st[i].x,st[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE-1);
+            SDL_RenderDrawCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
+            SDL_RenderDrawCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE-1);
         }
         ((showed-1)%2==0) ? SDL_SetRenderDrawColor(renderer,BLACK_STONE_STROKE):
                             SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
-        SDL_RenderDrawCircle(renderer,st[showed-1].x,st[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE);
-        SDL_RenderDrawCircle(renderer,st[showed-1].x,st[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE+1);
+        SDL_RenderDrawCircle(renderer,stones[showed-1].x,stones[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE);
+        SDL_RenderDrawCircle(renderer,stones[showed-1].x,stones[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE+1);
         // Update screen
         SDL_RenderPresent(renderer);
     } // quit loop
