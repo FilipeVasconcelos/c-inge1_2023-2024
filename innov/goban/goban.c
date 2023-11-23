@@ -3,24 +3,24 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
-
-#include <SDL.h>
-#include "SDL_ttf.h"
-
+#include <SDL2/SDL.h>
+#include "SDL2/SDL_ttf.h"
+#include "SDL2/SDL_image.h"
 #include "draw_circle.h"
 
 #define BLOCK_SIZE 24
 #define BLOCK_COUNT 10
-
 #define MAX_LEN 300
-// Define MAX and MIN macros
+//Define MAX and MIN macros
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
-// Some colors
+//Some colors
 #define WHITE 0xFF,0xFF,0xFF,0xFF
+#define SNOW 0xFF,0xFA,0xFA,0xFF
+#define HONEYDREW 0xF0,0xFF,0xF0,0xFF
 #define BLACK 0x00,0x00,0x00,0xFF
-// Define screen dimensions
+//Define screen dimensions
 //#define SCREEN_WIDTH    800
 //#define SCREEN_HEIGHT   600
 #define MIN_SCREEN_W   800
@@ -28,39 +28,42 @@
 int screen_width=800;
 int screen_height=600;
 
+//  
 typedef struct Vec2D{
     int x,y;
 } Vec2D;
 
+// return line index 0 to N-1 
+// from char c, 'a' is the reference  
 size_t sgftoline(char c){
     return (size_t) c - (size_t) 'a';
 }
 
-//SIZE of STONE 
+//STONE related 
 #define STONE_SIZE 0.45 
 #define MARK_SIZE 0.21
 #define BLACK_STONE_COLOR 0x16,0x15,0x1b,0xFF
-#define WHITE_STONE_COLOR 0xEF,0xED,0xEF,0xFF
+#define WHITE_STONE_COLOR 0xEE,0xEF,0xEE,0xFF
 #define BLACK_STONE_STROKE 0xFE,0xFD,0xFF,0xFF
-#define WHITE_STONE_STROKE 0x36,0x25,0x2b,0xFF
+#define WHITE_STONE_STROKE 0x26,0x15,0x2b,0xFF
 typedef struct Stone{
     int x;
     int y;
     size_t linex;
     size_t liney;
-//    int color;
 } Stone;
-
+//width,height size
 typedef struct Size{
     int w;
     int h;
 }Size;
 
-#define N 13 // NxN goban 
+// Goban related
+#define N 19 // NxN goban 
 #define NMAX_SEQUENCE N*N // NxN goban 
 #define GOBAN_COLOR 0xEB,0xC6,0x41,0xFF
-#define OFFSET 36
-#define RHOSHI 5 
+#define OFFSET 36 
+#define RHOSHI 3 
 typedef struct Goban{
     int size;
     SDL_Rect outer;
@@ -70,16 +73,33 @@ typedef struct Goban{
     int rhoshi;
 } Goban;
 
-void set_goban(Goban * goban,int w, int h)
+// goban :
+//  w : screen_width
+//  h : screen_height
+//
+//     <---------------- w ---------------->
+// ^   +-----------------------------------+
+// |   |            ^    
+// |   |            | outer.h 
+// |   |            | 
+// h   |            v 
+// |   | <------->  +----------------------+
+// |   |  outer.w   |         ^
+//                  |         | inner.h 
+//                  | <---->  v
+// v                | inner.w +---+---+---+
+//                            |   |   |   |
+//                            +---+---+---+
+void set_goban(Goban * goban, int w, int h)
 {
     goban->size    = N;
     goban->outer.w = MIN(w,h) * 0.75 ;
-    goban->outer.h = MIN(w,h) * 0.75;
+    goban->outer.h = MIN(w,h) * 0.80;
     goban->outer.x = w / 2 - goban->outer.w / 2;
     goban->outer.y = h / 2 - goban->outer.h / 2;
-    goban->offset.x=36;
-    goban->offset.y=36;
-    goban->rhoshi=3;
+    goban->offset.x=OFFSET;
+    goban->offset.y=OFFSET;
+    goban->rhoshi=RHOSHI;
     goban->cellsize.w=(goban->outer.w-2*goban->offset.x)/(N-1);
     goban->cellsize.h=(goban->outer.h-2*goban->offset.y)/(N-1);
     goban->inner.w=goban->cellsize.w*(N-1);
@@ -87,13 +107,6 @@ void set_goban(Goban * goban,int w, int h)
     goban->inner.x=goban->outer.x+goban->offset.x;
     goban->inner.y=goban->outer.y+goban->offset.y;
 }
-
-bool hoshi(int i, int n) {
-    if ( n==9 )  return (i==2) || (i==8);
-    if ( n==13 ) return (i==3) || (i==9) ;
-    if ( n==19 ) return (i==3) || (i==9) || (i==15);
-}
-
 
 // get pixel position from line :
 // line is a size_t between 1 and 19 
@@ -116,14 +129,13 @@ size_t get_line(int pos, char key, Goban goban) {
     return ((line>=0)&&(line<goban.size)) ? line+half : -1;
 }
 
-
+//reset line and pos from linex,liney and goban size
 void set_line_and_pos(Stone *st, size_t linex, size_t liney , Goban goban){
     st->linex=linex;
     st->liney=liney;
     st->x=get_pos(linex,'x',goban);
     st->y=get_pos(liney,'y',goban);
 }
-
 
 // return false if linex and liney was already played
 bool linefree(size_t n,Stone stones[],size_t linex,size_t liney)
@@ -135,6 +147,31 @@ bool linefree(size_t n,Stone stones[],size_t linex,size_t liney)
     }
     return true;
 }
+// render hoshi stars at line i for any n goban size
+void hoshi(SDL_Renderer *renderer, Goban *goban, int i, int n) {
+    if ( n==9 )  {
+        if ( (i==2) || (i==6) ) {
+            SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(2 ,'y',*goban),goban->rhoshi);
+            SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(6 ,'y',*goban),goban->rhoshi);
+        }
+        if (i==4)  SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(4 ,'y',*goban),goban->rhoshi);  
+    }
+    if ( n==13 ) {
+        if ( (i==3) || (i==9) ) {
+            SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(3 ,'y',*goban),goban->rhoshi);
+            SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(9 ,'y',*goban),goban->rhoshi);
+        }
+        if (i==6)  SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(6 ,'y',*goban),goban->rhoshi);  
+    }
+    if ( n==19 ) {
+        if ( (i==3) || (i==9) || (i==15) ) {
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(3 ,'y',*goban),goban->rhoshi);
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(9 ,'y',*goban),goban->rhoshi);
+                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(15,'y',*goban),goban->rhoshi);
+        }
+    }
+}
+
 /******************************************************************************
  * draw all background, lines, coordinates, hoshis
  *****************************************************************************/
@@ -142,7 +179,7 @@ void draw_background(SDL_Renderer *renderer, Goban *goban, SDL_Texture* Text_row
 {
     SDL_Rect textRect;    
     // Initialize renderer color white for the background
-    SDL_SetRenderDrawColor(renderer, WHITE);
+    SDL_SetRenderDrawColor(renderer, HONEYDREW);
     // Clear screen
     SDL_RenderClear(renderer);
     // Set renderer color for the goban  
@@ -172,24 +209,19 @@ void draw_background(SDL_Renderer *renderer, Goban *goban, SDL_Texture* Text_row
             int texH = 0;
             SDL_QueryTexture(Text_row[i], NULL, NULL, &texW, &texH);
             textRect.x=get_pos(i,'x',*goban)-texW/2;
-            textRect.y=get_pos(0,'y',*goban)-texH*2+10;
+            textRect.y=get_pos(0,'y',*goban)-texH*2;
             textRect.w=texW;
             textRect.h=texH;
             SDL_RenderCopy(renderer, Text_row[i], NULL, &textRect);
-            SDL_QueryTexture(Text_col[18-i], NULL, NULL, &texW, &texH);
-                textRect.x=get_pos(0,'x',*goban)-texW-10;
-                textRect.y=get_pos(i,'y',*goban)-texH/2;
+            SDL_QueryTexture(Text_col[N-1-i], NULL, NULL, &texW, &texH);
+            textRect.x=get_pos(0,'x',*goban)-texW-10;
+            textRect.y=get_pos(i,'y',*goban)-texH/2;
             textRect.w=texW;
             textRect.h=texH;
-            SDL_RenderCopy(renderer, Text_col[18-i], NULL, &textRect);
+            SDL_RenderCopy(renderer, Text_col[N-1-i], NULL, &textRect);
 
-            //Points Hoshi 3x3 points
-            if ( hoshi(i,N, goba) )
-            {
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(3 ,'y',*goban),goban->rhoshi);
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(9 ,'y',*goban),goban->rhoshi);
-                SDL_RenderFillCircle(renderer,get_pos(i,'x',*goban),get_pos(15,'y',*goban),goban->rhoshi);
-            }
+            //Draw all Hoshi points
+            hoshi(renderer, goban, i, N);
         }
 }
 
@@ -205,14 +237,12 @@ int main(int argc, char* argv[])
     Vec2D line;
     FILE* fptr;
     char sgfilename[MAX_LEN];
-
     // Initialize SDL
     if(SDL_Init(SDL_INIT_VIDEO) < 0)
     {
         fprintf(stderr,"SDL failed to initialise: %s\n",SDL_GetError());
         return 1;
     }
-
     if (TTF_Init()<0) 
     {
         fprintf(stderr, "Couldn't initialize TTF: %s\n",SDL_GetError());
@@ -248,7 +278,7 @@ int main(int argc, char* argv[])
         return 1;
     }
     SDL_Color textColor = {0,0,0};
-    char row[20] = "ABCDEFGHJKLMNOPQRST"; 
+    char row[26] = "ABCDEFGHJKLMNOPQRSTUVWXYZ"; 
     SDL_Surface* Surf_row[N];
     SDL_Surface* Surf_col[N];
     char *ptr=malloc(2*sizeof(char));
@@ -267,7 +297,25 @@ int main(int argc, char* argv[])
         Text_row[i]=SDL_CreateTextureFromSurface(renderer, Surf_row[i]);
         Text_col[i]=SDL_CreateTextureFromSurface(renderer, Surf_col[i]);
     }
+ 
+    SDL_Surface* wpng = IMG_Load("img/white.png");
+    SDL_Surface* bpng = IMG_Load("img/black.png");
+    if ((!wpng)||(!bpng))
+    {
+        printf("Erreur de chargement de l'image : %s",SDL_GetError());
+        return -1;
+    }
 
+    SDL_Rect src1={0, 0, 0, 0};
+    SDL_Texture* wstone = SDL_CreateTextureFromSurface(renderer,wpng); 
+    SDL_Texture* bstone = SDL_CreateTextureFromSurface(renderer,bpng); 
+    SDL_MapRGBA( wpng->format, 0, 0, 0, SDL_ALPHA_TRANSPARENT );
+    SDL_QueryTexture(wstone, NULL, NULL, &src1.w, &src1.h);
+    SDL_QueryTexture(bstone, NULL, NULL, &src1.w, &src1.h);
+
+
+    // background
+    draw_background(renderer,&board,Text_row,Text_col);
     // if reading from file
     if (argc > 1 ) {
         printf("reading sgf file %s\n",*(argv+1));
@@ -290,6 +338,7 @@ int main(int argc, char* argv[])
                 played++;
             }
         }
+        printf("played %ld",played);
     
         int returnCode = fclose( fptr );
         free(rline);
@@ -302,8 +351,6 @@ int main(int argc, char* argv[])
     Vec2D mousepos;
     bool quit = false;
     SDL_Event e;
-    // background
-    draw_background(renderer,&board,Text_row,Text_col);
     while(!quit)
     {
         if (SDL_WaitEvent(&e) != 0) {
@@ -371,26 +418,34 @@ int main(int argc, char* argv[])
         }
         //draw stones
         for (size_t i=0;i<showed;++i){
-            (i%2==0) ? SDL_SetRenderDrawColor(renderer, BLACK_STONE_COLOR) : SDL_SetRenderDrawColor(renderer, WHITE_STONE_COLOR);
-            SDL_RenderFillCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
-            SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
-            SDL_RenderDrawCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
-            SDL_RenderDrawCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE-1);
+        //    (i%2==0) ? SDL_SetRenderDrawColor(renderer, BLACK_STONE_COLOR) : SDL_SetRenderDrawColor(renderer, WHITE_STONE_COLOR);
+         //   SDL_RenderFillCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
+            SDL_Rect dst1={ stones[i].x-board.cellsize.w*0.5, stones[i].y-board.cellsize.h*0.5, 2*MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE, 2*MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE };
+//            S(i%2==0) ? DL_SetTextureBlendMode(wstone, SDL_BLENDMODE_NONE) : 
+            (i%2==0) ? SDL_RenderCopy(renderer, wstone, &src1, &dst1) : SDL_RenderCopy(renderer, bstone, &src1, &dst1);
+//            SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
+ //           SDL_RenderDrawCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE);
+//            SDL_RenderDrawCircle(renderer,stones[i].x,stones[i].y,MAX(board.cellsize.w,board.cellsize.h)*STONE_SIZE-1);
         }
         ((showed-1)%2==0) ? SDL_SetRenderDrawColor(renderer,BLACK_STONE_STROKE):
                             SDL_SetRenderDrawColor(renderer,WHITE_STONE_STROKE);
-        SDL_RenderDrawCircle(renderer,stones[showed-1].x,stones[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE);
-        SDL_RenderDrawCircle(renderer,stones[showed-1].x,stones[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE+1);
+//        SDL_RenderDrawCircle(renderer,stones[showed-1].x,stones[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE);
+ //       SDL_RenderDrawCircle(renderer,stones[showed-1].x,stones[showed-1].y,MAX(board.cellsize.w,board.cellsize.h)*MARK_SIZE+1);
+
+
         // Update screen
         SDL_RenderPresent(renderer);
     } // quit loop
-    //free memory
+    
+
+    // free memory Texture and Surfaces
     for (size_t i=0; i<N;i++) {
         SDL_DestroyTexture(Text_row[i]);
         SDL_DestroyTexture(Text_col[i]);
         SDL_FreeSurface(Surf_row[i]);
         SDL_FreeSurface(Surf_col[i]);
     }
+    SDL_DestroyTexture(wstone); 
 
     //Quit TTF related
     TTF_CloseFont(font);
