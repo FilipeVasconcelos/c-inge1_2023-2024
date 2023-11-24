@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
         return 2;
     }
     // Create window
-    SDL_Window *window = SDL_CreateWindow("CBoard v0.1",
+    SDL_Window *window = SDL_CreateWindow("CBoard v0.2",
                                           SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED,
                                           screen_width,screen_height,
