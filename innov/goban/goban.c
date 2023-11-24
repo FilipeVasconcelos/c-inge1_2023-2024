@@ -20,7 +20,6 @@
 int screen_width=800;
 int screen_height=600;
 
-
 /*
 typedef struct Groups{
     size_t liberty;
@@ -157,7 +156,7 @@ int main(int argc, char* argv[])
                                  (line.x<board.size)        && 
                                  (line.y<board.size)        && 
                                  (linefree(played,stones,line.x,line.y)) ) {
-                                set_stone(stones+played,line.x,line.y,board,played%2);
+                                set_stone(stones+showed,line.x,line.y,board,played%2);
                                 played++;
                                 showed++;
                             }
