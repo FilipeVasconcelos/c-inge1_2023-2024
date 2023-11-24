@@ -5,12 +5,12 @@ CPP=gcc
 CFLAGS := $(SDL_CFLAGS) -O3
 LDFLAGS := $(SDL_LDFLAGS) -lSDL2_ttf -lSDL2_image
 
-OBJ=draw_circle.o
+OBJ=tools.o draw_circle.o board.o stone.o sgf.o
 EXEC=goban
 
 all: ${EXEC}
 
-${EXEC}: ${EXEC}.o $(OBJ)
+${EXEC}:  $(OBJ) ${EXEC}.o
 	${CPP} $(CFLAGS) -o $@ $^ ${LDFLAGS}
 
 %.o : %.c
