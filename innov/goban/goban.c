@@ -132,7 +132,7 @@ int main(int argc, char* argv[])
     // boucle principale des évenements SDL
     while(!quit)
     {
-        if (SDL_WaitEvent(&e) != 0) {
+        if (SDL_WaitEvent(&e)) {
             switch (e.type) {
                 case SDL_MOUSEWHEEL:
                     if (e.wheel.y>0) {
@@ -201,7 +201,7 @@ int main(int argc, char* argv[])
                     quit = 1; 
                     break;
             }
-        }
+        } // SDL_event 
         //display stones sprite
         for (size_t i=0;i<showed;++i){
             (i%2==0) ? SDL_RenderCopy(renderer, bstone, &img, &(stones[i].sprite)) : 
