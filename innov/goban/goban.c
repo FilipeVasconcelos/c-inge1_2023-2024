@@ -125,7 +125,6 @@ int main(int argc, char* argv[])
 
     read_sgfile(sgfilename,board,stones,&played);
 
-
     bool quit = false;
     Vec2D line;
     SDL_Event e;
