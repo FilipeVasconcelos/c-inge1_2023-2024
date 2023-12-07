@@ -106,6 +106,9 @@ int main(int argc, char* argv[])
         Text_row[i]=SDL_CreateTextureFromSurface(renderer, Surf_row[i]);
         Text_col[i]=SDL_CreateTextureFromSurface(renderer, Surf_col[i]);
     }
+
+    SDL_Surface* Surf_move=TTF_RenderText_Solid(font, "Move :",textColor);
+    SDL_Texture* Text_move=SDL_CreateTextureFromSurface(renderer, Surf_move);
  
     SDL_Rect img={0, 0, 0, 0}; // pos and size of both images
     SDL_Surface* wpng = IMG_Load("img/white.png");
@@ -121,13 +124,13 @@ int main(int argc, char* argv[])
     SDL_QueryTexture(wstone, NULL, NULL, &img.w, &img.h);
 
     // background
-    draw_background(renderer,&board,Text_row,Text_col);
-
-    read_sgfile(sgfilename,board,stones,&played);
+    draw_background(renderer,&board,Text_row,Text_col,Text_move);
+    if (readingfromfile) read_sgfile(sgfilename,board,stones,&played);
 
     bool quit = false;
     Vec2D line;
     SDL_Event e;
+    SDL_Rect textRect;    
     // boucle principale des évenements SDL
     while(!quit)
     {
@@ -138,7 +141,7 @@ int main(int argc, char* argv[])
                         showed=(showed+5<=played) ? showed+5: played;
                     } else if (e.wheel.y<0) {
                         showed=((int) (showed-5)>=0) ? showed-5: 0;
-                        draw_background(renderer,&board,Text_row,Text_col);
+                        draw_background(renderer,&board,Text_row,Text_col,Text_move);
                     }
                 break;
                 case SDL_MOUSEBUTTONDOWN:
@@ -162,7 +165,7 @@ int main(int argc, char* argv[])
                             break;
                         case SDL_BUTTON_RIGHT:
                             showed=((int) (showed-1)>=0) ? showed-1: 0;
-                            draw_background(renderer,&board,Text_row,Text_col);
+                            draw_background(renderer,&board,Text_row,Text_col,Text_move);
                             break;
                       }
                     break;
@@ -173,7 +176,7 @@ int main(int argc, char* argv[])
                         if (screen_height<MIN_SCREEN_H) screen_height=MIN_SCREEN_H;
                         SDL_SetWindowSize(window,screen_width,screen_height);
                         set_board(&board,screen_width,screen_height);
-                        draw_background(renderer,&board,Text_row,Text_col);
+                        draw_background(renderer,&board,Text_row,Text_col,Text_move);
                         //reset position in pixel from new board size
                         for (size_t i=0;i<played;++i){
                             set_stone(stones+i,stones[i].linex,stones[i].liney,board,-1);
@@ -189,7 +192,7 @@ int main(int argc, char* argv[])
                         case SDLK_r:
                         case SDLK_PAGEDOWN:
                             showed=((int) (showed-1)>=0) ? showed-1: 0;
-                            draw_background(renderer,&board,Text_row,Text_col);
+                            draw_background(renderer,&board,Text_row,Text_col,Text_move);
                             break;
                         case SDLK_q:
                             quit = 1;

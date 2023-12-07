@@ -9,7 +9,7 @@
 #include "sgf.h"
 
 void read_sgfile(char* sgfilename, Board board, Stone stones[], size_t* played){
-/*
+
     FILE* fptr;
     //open SGF file
     fptr=fopen(sgfilename,"r");
@@ -25,11 +25,11 @@ void read_sgfile(char* sgfilename, Board board, Stone stones[], size_t* played){
             stones[*played].liney=sgftoline(rline[4]);
             stones[*played].x=get_pos(stones[*played].linex,'x',board);
             stones[*played].y=get_pos(stones[*played].liney,'y',board);
-            stones[*played].sprite.x=stones[played].x - board.half_cellsize.w;
-            stones[*played].sprite.y=stones[played].y - board.half_cellsize.h;
+            stones[*played].sprite.x=stones[*played].x - board.half_cellsize.w;
+            stones[*played].sprite.y=stones[*played].y - board.half_cellsize.h;
             stones[*played].sprite.w=board.maxcellsize;
             stones[*played].sprite.h=board.maxcellsize;
-            *played++;
+            (*played)++;
         }
     }
     printf("reading %ld moves\n",*played);
@@ -39,5 +39,5 @@ void read_sgfile(char* sgfilename, Board board, Stone stones[], size_t* played){
         fprintf( stderr, "Cannot close file\n" );
         exit( -1 );
     }
-    */
+    
 }

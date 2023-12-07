@@ -91,7 +91,12 @@ void hoshi(SDL_Renderer *renderer, Board *board, int i, int n) {
     }
 }
 // draw all background, lines, coordinates, hoshis
-void draw_background(SDL_Renderer *renderer, Board *board, SDL_Texture* Text_row[N], SDL_Texture* Text_col[N]) {
+void draw_background(SDL_Renderer *renderer, 
+                     Board *board, 
+                     SDL_Texture* Text_row[N], 
+                     SDL_Texture* Text_col[N],
+                     SDL_Texture* Text_move,
+                     size_t showed) {
     SDL_Rect textRect;    
     // Initialize renderer color white for the background
     SDL_SetRenderDrawColor(renderer, HONEYDREW);
@@ -119,23 +124,41 @@ void draw_background(SDL_Renderer *renderer, Board *board, SDL_Texture* Text_row
                                         get_pos(i,'x',*board)+ep,
                                         get_pos(0,'y',*board)+board->inner.h+ep);
         }
-            //draw text 
-            int texW = 0;
-            int texH = 0;
-            SDL_QueryTexture(Text_row[i], NULL, NULL, &texW, &texH);
-            textRect.x=get_pos(i,'x',*board)-texW/2;
-            textRect.y=get_pos(0,'y',*board)-texH*2;
-            textRect.w=texW;
-            textRect.h=texH;
-            SDL_RenderCopy(renderer, Text_row[i], NULL, &textRect);
-            SDL_QueryTexture(Text_col[N-1-i], NULL, NULL, &texW, &texH);
-            textRect.x=get_pos(0,'x',*board)-texW-10;
-            textRect.y=get_pos(i,'y',*board)-texH/2;
-            textRect.w=texW;
-            textRect.h=texH;
-            SDL_RenderCopy(renderer, Text_col[N-1-i], NULL, &textRect);
+        int texW = 0;
+        int texH = 0;
+        sprintf(str, "%ld", showed);
+        SDL_Surface* Surf_moveValue=TTF_RenderText_Solid(font, str ,textColor);
+        SDL_Texture* Text_moveValue=SDL_CreateTextureFromSurface(renderer, Surf_moveValue);
+        //draw Text_move 
+        SDL_QueryTexture(Text_moveValue, NULL, NULL, &texW, &texH);
+        textRect.x=10;
+        textRect.y=120;
+        textRect.w=texW;
+        textRect.h=texH;
+        SDL_RenderCopy(renderer, Text_moveValue, NULL, &textRect);
+        //draw Text_move 
+        SDL_QueryTexture(Text_move, NULL, NULL, &texW, &texH);
+        textRect.x=10;
+        textRect.y=100;
+        textRect.w=texW;
+        textRect.h=texH;
+        SDL_RenderCopy(renderer, Text_move, NULL, &textRect);
+        //draw Text_row 1 2 3 ... 19
+        SDL_QueryTexture(Text_row[i], NULL, NULL, &texW, &texH);
+        textRect.x=get_pos(i,'x',*board)-texW/2;
+        textRect.y=get_pos(0,'y',*board)-texH*2;
+        textRect.w=texW;
+        textRect.h=texH;
+        SDL_RenderCopy(renderer, Text_row[i], NULL, &textRect);
+        //draw Text_col A B C D ... S T
+        SDL_QueryTexture(Text_col[N-1-i], NULL, NULL, &texW, &texH);
+        textRect.x=get_pos(0,'x',*board)-texW-10;
+        textRect.y=get_pos(i,'y',*board)-texH/2;
+        textRect.w=texW;
+        textRect.h=texH;
+        SDL_RenderCopy(renderer, Text_col[N-1-i], NULL, &textRect);
 
-            //Draw all Hoshi points
-            hoshi(renderer, board, i, N);
-        }
+        //Draw all Hoshi points
+        hoshi(renderer, board, i, N);
+    }
 }

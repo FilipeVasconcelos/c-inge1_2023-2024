@@ -29,5 +29,9 @@ int get_pos(size_t line, char key, Board board);
 size_t get_line(int pos, char key, Board board);
 void set_board(Board * board, int w, int h);
 void hoshi(SDL_Renderer *renderer, Board *board, int i, int n);
-void draw_background(SDL_Renderer *renderer, Board *board, SDL_Texture* Text_row[N], SDL_Texture* Text_col[N]);
+void draw_background(SDL_Renderer *renderer, 
+                     Board *board, 
+                     SDL_Texture* Text_row[N], 
+                     SDL_Texture* Text_col[N],
+                     SDL_Texture* Score);
 #endif /* BOARD_H_ */
