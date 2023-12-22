@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
+#include "SDL2/SDL_ttf.h"
 #include "draw_circle.h"
 #include "board.h"
 #include "stone.h"
@@ -26,6 +27,26 @@ bool linefree(size_t n,Stone stones[],size_t linex,size_t liney)
         }
     }
     return true;
+}
+// render last stone + marker on stone
+void render_last_stone(SDL_Renderer *renderer, Board board,  SDL_Rect img, 
+                       SDL_Texture* wstone, SDL_Texture* bstone, Stone st, size_t showed){
+    render_stone(renderer,st,img,wstone,bstone,showed);
+    render_marker_on_stone(renderer,board,st,showed);
+}
+
+//render stone
+void render_stone(SDL_Renderer *renderer, Stone st, SDL_Rect img, SDL_Texture* wstone, SDL_Texture* bstone,  size_t showed ){
+    (showed%2==0) ? SDL_RenderCopy(renderer, bstone, &img, &(st.sprite)) : 
+                    SDL_RenderCopy(renderer, wstone, &img, &(st.sprite));
+}
+//render stones
+void render_stones(SDL_Renderer *renderer, Stone st[], SDL_Rect img, SDL_Texture* wstone, SDL_Texture* bstone,  size_t showed ){
+    if (showed == 0 ) return ;
+    //display stones sprite
+    for (size_t i=0;i<showed-1;++i){
+        render_stone(renderer,st[i],img,wstone,bstone,i);
+    }
 }
 
 // render marker on stone usually used on last stone

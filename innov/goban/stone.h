@@ -21,5 +21,9 @@ typedef struct Stone{
 
 void set_stone(Stone *st, size_t linex, size_t liney , Board board, int color);
 bool linefree(size_t n,Stone stones[],size_t linex,size_t liney);
+void render_stone(SDL_Renderer *renderer, Stone st, SDL_Rect img, SDL_Texture* wstone, SDL_Texture* bstone,  size_t showed );
+void render_last_stone(SDL_Renderer *renderer, Board board,  SDL_Rect img, 
+                       SDL_Texture* wstone, SDL_Texture* bstone, Stone st, size_t showed);
+void render_stones(SDL_Renderer *renderer, Stone st[], SDL_Rect img, SDL_Texture* wstone, SDL_Texture* bstone,  size_t showed );
 void render_marker_on_stone(SDL_Renderer *renderer,Board board, Stone st, size_t i);
 #endif /* STONE_H_ */

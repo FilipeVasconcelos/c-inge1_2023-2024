@@ -3,10 +3,11 @@
 // ----------------------------------------------------------------------------
 #include <stdlib.h>
 #include <SDL2/SDL.h>
+#include "SDL2/SDL_ttf.h"
 #include "draw_circle.h"
-#include "colors.h"
 #include "board.h"
 #include "tools.h"
+#include "colors.h"
 
 // get pixel position from line :
 // line is a size_t between 1 and 19 
@@ -26,7 +27,7 @@ size_t get_line(int pos, char key, Board board) {
     line=(key=='x') ? diff/board.cellsize.w :
                       diff/board.cellsize.h ;
  
-    return ((line>=0)&&(line<board.size)) ? line+half : -1;
+    return ( (line>=0) && (line<board.size) ) ? line+half : -1;
 }
 
 // board :
@@ -47,6 +48,8 @@ size_t get_line(int pos, char key, Board board) {
 //                            |   |   |   |
 //                            +---+---+---+
 void set_board(Board * board, int w, int h) {
+    board->screen.w = w;
+    board->screen.h = h;
     board->size    = N;
     board->outer.w = MIN(w,h) * 0.75 ;
     board->outer.h = MIN(w,h) * 0.75;
@@ -90,13 +93,32 @@ void hoshi(SDL_Renderer *renderer, Board *board, int i, int n) {
         }
     }
 }
+
+void render_text_from_int(SDL_Renderer *renderer,TTF_Font* font,SDL_Color textColor, int i, int x, int y){ 
+
+    char str[MAX_LEN];
+    int texW = 0;
+    int texH = 0;
+    SDL_Rect textRect;
+    sprintf(str, "%d", i);
+    SDL_Surface* s=TTF_RenderText_Solid(font, str ,textColor);
+    SDL_Texture* t=SDL_CreateTextureFromSurface(renderer, s);
+    SDL_QueryTexture(t, NULL, NULL, &texW, &texH);
+    textRect.x=x;
+    textRect.y=y;
+    textRect.w=texW;
+    textRect.h=texH;
+    SDL_RenderCopy(renderer, t, NULL, &textRect);
+    SDL_DestroyTexture(t);
+    SDL_FreeSurface(s);
+}
+
 // draw all background, lines, coordinates, hoshis
 void draw_background(SDL_Renderer *renderer, 
                      Board *board, 
-                     SDL_Texture* Text_row[N], 
-                     SDL_Texture* Text_col[N],
-                     SDL_Texture* Text_move,
-                     size_t showed) {
+                     SDL_Texture* Text_row[], 
+                     SDL_Texture* Text_col[],
+                     SDL_Texture* Text_move) {
     SDL_Rect textRect;    
     // Initialize renderer color white for the background
     SDL_SetRenderDrawColor(renderer, HONEYDREW);
@@ -126,20 +148,12 @@ void draw_background(SDL_Renderer *renderer,
         }
         int texW = 0;
         int texH = 0;
-        sprintf(str, "%ld", showed);
-        SDL_Surface* Surf_moveValue=TTF_RenderText_Solid(font, str ,textColor);
-        SDL_Texture* Text_moveValue=SDL_CreateTextureFromSurface(renderer, Surf_moveValue);
-        //draw Text_move 
-        SDL_QueryTexture(Text_moveValue, NULL, NULL, &texW, &texH);
-        textRect.x=10;
-        textRect.y=120;
-        textRect.w=texW;
-        textRect.h=texH;
-        SDL_RenderCopy(renderer, Text_moveValue, NULL, &textRect);
         //draw Text_move 
         SDL_QueryTexture(Text_move, NULL, NULL, &texW, &texH);
-        textRect.x=10;
-        textRect.y=100;
+        textRect.x=board->screen.w*0.05;
+        textRect.y=board->screen.h*0.1;
+        //textRect.x=10;
+        //textRect.y=100;
         textRect.w=texW;
         textRect.h=texH;
         SDL_RenderCopy(renderer, Text_move, NULL, &textRect);

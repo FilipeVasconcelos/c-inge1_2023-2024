@@ -2,11 +2,12 @@
 #include<stdlib.h>
 #include<string.h>
 #include<stdbool.h>
-#include <SDL2/SDL.h>
-#include "tools.h"
-#include "board.h"
-#include "stone.h"
-#include "sgf.h"
+#include<SDL2/SDL.h>
+#include"SDL2/SDL_ttf.h"
+#include"tools.h"
+#include"board.h"
+#include"stone.h"
+#include"sgf.h"
 
 void read_sgfile(char* sgfilename, Board board, Stone stones[], size_t* played){
 

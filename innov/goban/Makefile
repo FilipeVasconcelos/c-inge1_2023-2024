@@ -1,21 +1,19 @@
 SDL_CFLAGS := $(shell sdl2-config --cflags)
 SDL_LDFLAGS := $(shell sdl2-config --libs)
 
-CPP=gcc
+CC=gcc
 CFLAGS := $(SDL_CFLAGS) -O3
 LDFLAGS := $(SDL_LDFLAGS) -lSDL2_ttf -lSDL2_image
 
-OBJ=tools.o draw_circle.o board.o stone.o sgf.o
+OBJ=colors.o tools.o draw_circle.o board.o stone.o sgf.o goban.o
 EXEC=goban
 
-all: ${EXEC}
 
-${EXEC}:  $(OBJ) ${EXEC}.o
-	${CPP} $(CFLAGS) -o $@ $^ ${LDFLAGS}
+goban: $(OBJ)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
-%.o : %.c
-	$(CPP) $(CFLAGS) -o $@ -c $<
-
+%.o: %.c $(DEPS)
+	$(CC) -I./ $(CFLAGS) $(CPPDEFS) -o $@ -c $<
 
 clean:  
 	rm -fr *.o
